@@ -109,23 +109,25 @@ void Init_GPIO(void) {
     GPIO_setAsOutputPin(GPIO_PORT_P1, GPIO_PIN1); // P1.1 is a debugging LED; currently toggles with each keypress.
     GPIO_setOutputLowOnPin(GPIO_PORT_P1, GPIO_PIN1);
 
-    //Uncomment the section below for the debugging panel
-    //GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN0); //Current use: Whole byte of indexLine
-    //GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN0);
-    //GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN1); //Current use:
-    //GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN1);
-    //GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN2); //Current use:
-    //GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN2);
-    //GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN3); //Current use:
-    //GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN3);
-    //GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN4); //Current use:
-    //GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN4);
-    //GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN5); //Current use:
-    //GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN5);
-    //GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN6); //Current use:
-    //GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN6);
-    //GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN7); //Current use:
-    //GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN7);
+    // Set up debugging panel GPIO
+    #ifdef DEBUG
+    GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN0); //Current use: Whole byte of indexLine
+    GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN0);
+    GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN1); //Current use:
+    GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN1);
+    GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN2); //Current use:
+    GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN2);
+    GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN3); //Current use:
+    GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN3);
+    GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN4); //Current use:
+    GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN4);
+    GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN5); //Current use:
+    GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN5);
+    GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN6); //Current use:
+    GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN6);
+    GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN7); //Current use:
+    GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN7);
+    #endif
 
     //Inputs Block
     //This sets up the buttons as indicated below.
@@ -180,69 +182,86 @@ void Init_Timers(void) {
     Timer_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
 }
 
+void Init_Buttons(void){
+    buttons_state = 0;
+    buttonsBar[0] = ' ';
+    buttonsBar[1] = ' ';
+    buttonsBar[2] = 'A';
+    buttonsBar[3] = 'B';
+    buttonsBar[4] = 'C';
+    buttonsBar[5] = 'D';
+    buttonsBar[6] = ' ';
+    buttonsBar[7] = ' ';
+    buttonsBar[8] = 0;
+}
+
+void Display_Splash_with_Delay(int cycles){
+    DisplaySplash();
+    printTextSmall(VERSION, 118);
+    // Normally stuff happens here, this is just as a demonstration to allow the page to remain a while
+    __delay_cycles(cycles);  
+    LCDClearDisplay();
+}
+
+void Print_Uptime(void){
+    // write clock to display by forming a string literal representing the current time
+    bufferText[0] = ' ';
+    bufferText[1] = timeMinute / 10 + '0';
+    bufferText[2] = timeMinute % 10 + '0';
+    bufferText[3] = ':';
+    bufferText[4] = timeSecond / 10 + '0';
+    bufferText[5] = timeSecond % 10 + '0';
+    bufferText[6] = 0;
+    printTextSmall(bufferText,88); // There is still a bug here, this line doesn't fully display.
+}
 
 int main(void) {
+    // Kosmo: could any of this init go into an init function?
 
-    WDTCTL = WDTPW | WDTHOLD; // Disable the watchdog timer. We might rely on this later, but not for now.
-        P1IFG = 0;  // Clear P1 IFGs, more as a formality than anything.
-        // Disable the GPIO power-on default high-impedance mode
-        // to activate previously configured port settings
-        SFRIFG1 &= ~OFIFG; // Clear the OFIFG because occasionally strange IFGs get set that we aren't handling.
-        PMM_unlockLPM5();  // Without this output pins can be stuck at current state causing apparent freezes.
-        Init_GPIO();
-        Init_Timers();
-        Init_SPI();
-        Init_LCD();
-        DisplaySplash();
-        printTextSmall(VERSION, 118);
-        __delay_cycles(1000000);  //Normally stuff happens here, this is just as a demonstration to allow the page to remain a while
-        //GPIO_setOutputHighOnPin(GPIO_PORT_P1, GPIO_PIN1);
-        LCDClearDisplay();
-        printTextMedium("  HELLO, WORLD! ", 1);
-        printTextSmall("      PETI      ", 16);
-        printTextSmall("      SAYS      ", 24);
-        printTextSmall("       HI       ", 32);
-        printTextSmall("1234567890123456", 56);
-        printTextSmall("UPTIME:",72);
-        buttons_state = 0;
-        buttonsBar[0] = ' ';
-        buttonsBar[1] = ' ';
-        buttonsBar[2] = 'A';
-        buttonsBar[3] = 'B';
-        buttonsBar[4] = 'C';
-        buttonsBar[5] = 'D';
-        buttonsBar[6] = ' ';
-        buttonsBar[7] = ' ';
-        buttonsBar[8] = 0;
-        //Update_Buttons_Bar();
-        //printTextLarge(buttonsBar, 48);
+    // Disable the watchdog timer. We might rely on this later, but not for now.
+    WDTCTL = WDTPW | WDTHOLD; 
+    
+    // Clear P1 IFGs, more as a formality than anything.
+    // Disable the GPIO power-on default high-impedance mode
+    // to activate previously configured port settings
+    P1IFG = 0;  
+    
+    // Clear the OFIFG because occasionally strange IFGs get set that we aren't handling.
+    SFRIFG1 &= ~OFIFG;
 
-        while (1)
-        {
+    // Without this output pins can be stuck at current state causing apparent freezes. 
+    PMM_unlockLPM5();  
+    
+    Init_GPIO();
+    Init_Timers();
+    Init_SPI();
+    Init_LCD();
+    Init_Buttons();
+
+    Display_Splash_with_Delay(1000000);
+    printTextMedium("  HELLO, WORLD! ", 1);
+    printTextSmall("      PETI      ", 16);
+    printTextSmall("      SAYS      ", 24);
+    printTextSmall("       HI       ", 32);
+    printTextSmall("1234567890123456", 56);
+    printTextSmall("UPTIME:", 72);
+
+    while (1){
         PMM_unlockLPM5();
-        //__delay_cycles(1000);
-        // write clock to display by forming a string literal representing the current time
         Update_Button_States();
         Update_Buttons_Bar();
-        bufferText[0] = ' ';
-        bufferText[1] = timeMinute / 10 + '0';
-        bufferText[2] = timeMinute % 10 + '0';
-        bufferText[3] = ':';
-        bufferText[4] = timeSecond / 10 + '0';
-        bufferText[5] = timeSecond % 10 + '0';
-        bufferText[6] = 0;
-        printTextSmall(bufferText,88); // There is still a bug here, this line doesn't fully display.
+        Print_Uptime();
         printTextLarge(buttonsBar, 100);
-        ToggleVCOM(); //<- Removing this KILLS the ISRtrap bug.
+        // Removing below KILLS the ISRtrap bug.
+        ToggleVCOM(); 
         __bis_SR_register(LPM0_bits | GIE);
-        };
     }
+}
 
 
 // interrupt service routine to handle timer A; drives VCOM and readable clock; mostly for demonstration
 #pragma vector=TIMER0_A0_VECTOR
-__interrupt void VCOM_ISR (void)
-{
+__interrupt void VCOM_ISR (void){
     timeMSec++;// count milliseconds
     Timer_A_clearTimerInterrupt(TIMER_A0_BASE);
     Timer_A_clearCaptureCompareInterrupt(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_0);
@@ -276,37 +295,33 @@ __interrupt void VCOM_ISR (void)
 // In future they should not "do" what their key does, simply set a flag used in main() indicating the button was pressed.
 
 #pragma vector=PORT5_VECTOR
-__interrupt void BUTTON_C_ISR (void)
-{
-        GPIO_clearInterrupt(GPIO_PORT_P5, GPIO_PIN7);
-        GPIO_toggleOutputOnPin(GPIO_PORT_P1, GPIO_PIN1); //deprecate these.
-        buttons_state |= button_c_pressed;
-        __bic_SR_register_on_exit(LPM0_bits);            // wake up main loop every second
+__interrupt void BUTTON_C_ISR (void){
+    GPIO_clearInterrupt(GPIO_PORT_P5, GPIO_PIN7);
+    GPIO_toggleOutputOnPin(GPIO_PORT_P1, GPIO_PIN1); //deprecate these.
+    buttons_state |= button_c_pressed;
+    __bic_SR_register_on_exit(LPM0_bits);            // wake up main loop every second
 }
 
 #pragma vector=PORT6_VECTOR
-__interrupt void BUTTON_A_ISR (void)
-{
-        GPIO_clearInterrupt(GPIO_PORT_P6, GPIO_PIN0);
-        GPIO_toggleOutputOnPin(GPIO_PORT_P1, GPIO_PIN1);
-        buttons_state |= button_a_pressed;
-        __bic_SR_register_on_exit(LPM0_bits);            // wake up main loop every second
+__interrupt void BUTTON_A_ISR (void){
+    GPIO_clearInterrupt(GPIO_PORT_P6, GPIO_PIN0);
+    GPIO_toggleOutputOnPin(GPIO_PORT_P1, GPIO_PIN1);
+    buttons_state |= button_a_pressed;
+    __bic_SR_register_on_exit(LPM0_bits);            // wake up main loop every second
 }
 
 #pragma vector=PORT7_VECTOR
-__interrupt void BUTTON_B_ISR (void)
-{
-        GPIO_clearInterrupt(GPIO_PORT_P7, GPIO_PIN1);
-        GPIO_toggleOutputOnPin(GPIO_PORT_P1, GPIO_PIN1);
-        buttons_state |= button_b_pressed;
-        __bic_SR_register_on_exit(LPM0_bits);            // wake up main loop every second
+__interrupt void BUTTON_B_ISR (void){
+    GPIO_clearInterrupt(GPIO_PORT_P7, GPIO_PIN1);
+    GPIO_toggleOutputOnPin(GPIO_PORT_P1, GPIO_PIN1);
+    buttons_state |= button_b_pressed;
+    __bic_SR_register_on_exit(LPM0_bits);            // wake up main loop every second
 }
 
 #pragma vector=PORT8_VECTOR
-__interrupt void BUTTON_D_ISR (void)
-{
-        GPIO_clearInterrupt(GPIO_PORT_P8, GPIO_PIN3);
-        GPIO_toggleOutputOnPin(GPIO_PORT_P1, GPIO_PIN1);
-        buttons_state |= button_d_pressed;
-        __bic_SR_register_on_exit(LPM0_bits);            // wake up main loop every second
+__interrupt void BUTTON_D_ISR (void){
+    GPIO_clearInterrupt(GPIO_PORT_P8, GPIO_PIN3);
+    GPIO_toggleOutputOnPin(GPIO_PORT_P1, GPIO_PIN1);
+    buttons_state |= button_d_pressed;
+    __bic_SR_register_on_exit(LPM0_bits);            // wake up main loop every second
 }
